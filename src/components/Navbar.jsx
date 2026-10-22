@@ -6,7 +6,7 @@ function Navbar() {
 return (
     <header className="header">
     <Link to="/" className="logo">
-        My Website
+        Recipe Box
     </Link>
 
     <nav className="navbar">
