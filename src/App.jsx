@@ -3,6 +3,7 @@ import Collections from './pages/Collections';
 import Account from './pages/Account';
 import Navbar from "./components/Navbar";
 import Home from './pages/Home';
+import SignUp from './pages/SignUp';
 
 function App() {
 
@@ -15,6 +16,7 @@ function App() {
           <Route path="/" element={<Home />}/>
           <Route path="/collections" element={<Collections />}/>
           <Route path="/account" element={<Account />}/>
+          <Route path='/signup' element={<SignUp />}/>
         </Routes>
       </main>
     </BrowserRouter>
