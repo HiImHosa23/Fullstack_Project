@@ -13,6 +13,7 @@ return (
         <Link to="/">Home</Link>
         <Link to="/collections">Collections</Link>
         <Link to="/account">Account</Link>
+        <Link to="/signup">Sign Up / Log In</Link>
     </nav>
     </header>
 );
