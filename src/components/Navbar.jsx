@@ -15,6 +15,7 @@ return (
         <Link to="/account">Account</Link>
         <Link to="/signup">Sign Up</Link>
         <Link to="/login">Login</Link>
+        <Link to="/add-recipe">Add Recipe</Link>
     </nav>
     </header>
 );

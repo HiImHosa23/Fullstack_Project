@@ -32,6 +32,16 @@ app.use(session({
     }
 }));
 
+function requireAuth(req, res, next) {
+    if (!req.session.user) {
+        return res.status(401).json({
+            error: "You must be logged in to access this feature."
+        });
+    }
+
+    next();
+}
+
 app.get("/", (req, res) => {
     res.send("Backend is working!");
 });
@@ -45,36 +55,100 @@ app.get("/db-test", async (req, res) => {
     }
 });
 
-app.get("/api/recipes", async (req, res) => {
+app.get("/api/recipes", requireAuth, async (req, res) => {
     try {
+        const userId = req.session.user.id;
+
+        console.log("Logged-in user ID:", userId);
+
         const result = await pool.query(
-            "SELECT * FROM recipes" //if we want by date (newest to oldest) we could do ORDER BY created_at DESC
+            `SELECT * FROM recipes
+            WHERE user_id = $1
+            ORDER BY created_at DESC`,
+            [userId]
         );
+
+        console.log("Recipes found:", result.rows);
+
         res.json(result.rows);
-    }catch(err){
+
+    } catch (err) {
         console.error("Error fetching recipes:", err);
+
         res.status(500).json({
-            error: "Failed ro retrieve recipes"
+            error: "Failed to retrieve recipes"
         });
     }
 });
 
-app.post("/api/auth/register", async(req, res) => {
-    try{
-        const {name, username, email, password} = req.body;
+app.post("/api/recipes", requireAuth, async (req, res) => {
+    try {
+        const {
+            name,
+            description,
+            image_url,
+            category,
+            prep_time,
+            cook_time,
+            servings,
+            difficulty,
+            ingredients,
+            instructions
+        } = req.body;
 
-        if(!name || !username || !email || !password){
+        const result = await pool.query(
+            `INSERT INTO recipes (
+                name, description, image_url, category,
+                prep_time, cook_time, servings, difficulty,
+                ingredients, instructions, user_id
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING *`,
+            [
+                name,
+                description,
+                image_url,
+                category,
+                prep_time,
+                cook_time,
+                servings,
+                difficulty,
+                ingredients,
+                instructions,
+                req.session.user.id
+            ]
+        );
+
+        res.status(201).json({
+            message: "Recipe added successfully!",
+            recipe: result.rows[0]
+        });
+
+    } catch (err) {
+        console.error("Error adding recipes:", err);
+
+        res.status(500).json({
+            error: "Failed to add recipe."
+        });
+    }
+});
+
+app.post("/api/auth/register", async (req, res) => {
+    try {
+        const { name, username, email, password } = req.body;
+
+        if (!name || !username || !email || !password) {
             return res.status(400).json({
                 error: "Please fill in all fields"
             });
         }
 
-        if(password.length < 8){
+        if (password.length < 8) {
             return res.status(400).json({
                 error: "Password must be at least 8 characters."
             });
         }
-        
+
         const passwordHash = await bcrypt.hash(password, 12);
         const result = await pool.query(
             `INSERT INTO users (name, username, email, password_hash)
@@ -89,14 +163,14 @@ app.post("/api/auth/register", async(req, res) => {
             message: "Account created successfully!",
             user: user
         });
-    } catch (err){
+    } catch (err) {
         console.error("Registration error:", err);
-        if(err.code === "23505"){
+        if (err.code === "23505") {
             return res.status(409).json({
                 error: "That username or email is already taken."
             });
         }
-        
+
         res.status(500).json({
             error: "Something went wrong while creating this account"
         })
@@ -105,9 +179,9 @@ app.post("/api/auth/register", async(req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
     try {
-        const {email, password} = req.body;
+        const { email, password } = req.body;
 
-        if(!email || !password){
+        if (!email || !password) {
             return res.status(400).json({
                 error: "Please enter your email and password."
             });
@@ -118,10 +192,10 @@ app.post("/api/auth/login", async (req, res) => {
             [email]
         );
 
-        if(result.rows.length === 0){
+        if (result.rows.length === 0) {
             return res.status(401).json({
                 error: "Invalid email or password."
-            }); 
+            });
         }
 
         const user = result.rows[0];
@@ -130,7 +204,7 @@ app.post("/api/auth/login", async (req, res) => {
             user.password_hash
         );
 
-        if(!passwordMatches){
+        if (!passwordMatches) {
             return res.status(401).json({
                 error: "Invalid email or password."
             });
@@ -138,7 +212,7 @@ app.post("/api/auth/login", async (req, res) => {
 
         await new Promise((resolve, reject) => {
             req.session.regenerate((err) => {
-                if(err) reject(err);
+                if (err) reject(err);
                 else resolve();
             });
         });
@@ -153,7 +227,7 @@ app.post("/api/auth/login", async (req, res) => {
 
         await new Promise((resolve, reject) => {
             req.session.save((err) => {
-                if(err) reject(err);
+                if (err) reject(err);
                 else resolve();
             });
         });
@@ -162,7 +236,7 @@ app.post("/api/auth/login", async (req, res) => {
             message: "Login successful!",
             user: req.session.user
         });
-    }catch(err){
+    } catch (err) {
         console.error("Login error:", err);
         res.status(500).json({
             error: "Something went wrong while logging in."
@@ -171,7 +245,7 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.get("/api/auth/me", (req, res) => {
-    if(!req.session.user){
+    if (!req.session.user) {
         return res.status(401).json({
             error: "You are not logged in."
         });
