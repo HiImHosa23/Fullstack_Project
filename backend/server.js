@@ -133,6 +133,97 @@ app.post("/api/recipes", requireAuth, async (req, res) => {
     }
 });
 
+app.put("/api/recipes/:id", requireAuth, async (req, res) => {
+    try {
+        const {
+            name,
+            description,
+            image_url,
+            category,
+            prep_time,
+            cook_time,
+            servings,
+            difficulty,
+            ingredients,
+            instructions
+        } = req.body;
+
+        const result = await pool.query(
+            `UPDATE recipes
+            SET name = $1,
+                description = $2,
+                image_url = $3,
+                category = $4,
+                prep_time = $5,
+                cook_time = $6,
+                servings = $7,
+                difficulty = $8,
+                ingredients = $9,
+                instructions = $10
+            WHERE id = $11 AND user_id = $12
+            RETURNING *`,
+            [
+                name,
+                description,
+                image_url,
+                category,
+                prep_time,
+                cook_time,
+                servings,
+                difficulty,
+                ingredients,
+                instructions,
+                req.params.id,
+                req.session.user.id
+            ]
+        );
+
+        if(result.rows.length === 0){
+            return res.status(404).json({
+                error: "Recipe not found."
+            });
+        }
+
+        res.json({
+            message: "Recipe updated successfully!",
+            recipe: result.rows[0]
+        });
+    }catch(err){
+        console.error("Error updating recipe:", err);
+        res.status(500).json({
+            error: "Failed to update recipe."
+        });
+    }
+});
+
+app.get("/api/recipes/:id", requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT * FROM recipes
+            WHERE id = $1 AND user_id = $2`,
+            [
+                req.params.id,
+                req.session.user.id
+            ]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: "Recipe not found."
+            });
+        }
+
+        res.json(result.rows[0]);
+
+    } catch (err) {
+        console.error("Error fetching recipe:", err);
+        res.status(500).json({
+            error: "Failed to retrieve recipe."
+        });
+    }
+});
+
+
 app.post("/api/auth/register", async (req, res) => {
     try {
         const { name, username, email, password } = req.body;

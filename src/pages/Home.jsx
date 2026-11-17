@@ -1,11 +1,12 @@
 import "./Home.css";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Home() {
     const [recipes, setRecipes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const navigate = useNavigate();
 
     useEffect(() => {
         async function fetchRecipes() {
@@ -68,6 +69,8 @@ function Home() {
                         <p>Cook Time: {recipe.cook_time} minutes</p>
                         <p>Servings: {recipe.servings}</p>
                         <p>Difficulty: {recipe.difficulty}</p>
+
+                        <button onClick={() => navigate(`/edit-recipe/${recipe.id}`)}>Edit Recipe</button>
                     </div>
                 ))}
             </div>
