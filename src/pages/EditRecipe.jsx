@@ -1,9 +1,10 @@
+import "./EditRecipe.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 
-function EditRecipe(){
-    const {id} = useParams();
+function EditRecipe() {
+    const { id } = useParams();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: "",
@@ -19,9 +20,10 @@ function EditRecipe(){
     });
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState("");
+    const [imageFile, setImageFile] = useState(null);
 
     useEffect(() => {
-        async function fetchRecipe(){
+        async function fetchRecipe() {
             try {
                 const response = await fetch(
                     `http://localhost:4000/api/recipes/${id}`,
@@ -30,8 +32,8 @@ function EditRecipe(){
                     }
                 );
 
-                if(!response.ok){
-                    if(response.status === 401){
+                if (!response.ok) {
+                    if (response.status === 401) {
                         navigate("/login");
                         return;
                     }
@@ -54,10 +56,10 @@ function EditRecipe(){
                     ingredients: recipe.ingredients || "",
                     instructions: recipe.instructions || ""
                 });
-            }catch (error){
+            } catch (error) {
                 console.error(error);
                 setMessage("Could not load recipe.");
-            }finally{
+            } finally {
                 setLoading(false);
             }
         }
@@ -77,20 +79,29 @@ function EditRecipe(){
         e.preventDefault();
 
         try {
+            const recipeData = new FormData();
+
+            Object.entries(formData).forEach(([key, value]) => {
+                if (["prep_time", "cook_time", "servings"].includes(key)) {
+                    recipeData.append(
+                        key,
+                        value === "" ? "" : Number(value)
+                    );
+                } else {
+                    recipeData.append(key, value);
+                }
+            });
+
+            if (imageFile) {
+                recipeData.append("image", imageFile);
+            }
+
             const response = await fetch(
                 `http://localhost:4000/api/recipes/${id}`,
                 {
                     method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
                     credentials: "include",
-                    body: JSON.stringify({
-                        ...formData,
-                        prep_time: formData.prep_time === "" ? null : Number(formData.prep_time),
-                        cook_time: formData.cook_time === "" ? null : Number(formData.cook_time),
-                        servings: formData.servings === "" ? null : Number(formData.servings)
-                    })
+                    body: recipeData
                 }
             );
 
@@ -102,7 +113,6 @@ function EditRecipe(){
             }
 
             navigate("/");
-
         } catch (error) {
             console.error(error);
             setMessage("Could not connect to the server.");
@@ -116,7 +126,7 @@ function EditRecipe(){
     return (
         <div>
             <h1>Edit Recipe</h1>
-            
+
             <form onSubmit={handleSubmit}>
                 <div>
                     <label>Recipe Name</label>
@@ -136,11 +146,19 @@ function EditRecipe(){
                     />
                 </div>
                 <div>
-                    <label>Image URL</label>
+                    <label>Chosen Image</label>
+                    {formData.image_url && (
+                        <img
+                            className="recipe-image"
+                            src={`http://localhost:4000${formData.image_url}`}
+                            alt={formData.name}
+                        />
+                    )}
+                    <label>Choose a New Image</label>
                     <input
-                        name="image_url"
-                        value={formData.image_url}
-                        onChange={handleChange}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) => setImageFile(e.target.files[0])}
                     />
                 </div>
                 <div>

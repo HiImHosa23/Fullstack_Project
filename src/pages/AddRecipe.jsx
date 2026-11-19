@@ -5,8 +5,9 @@ function AddRecipe() {
     const navigate = useNavigate();
     const [checkingLogin, setCheckingLogin] = useState(true);
 
+
     useEffect(() => {
-        async function checkLogin(){
+        async function checkLogin() {
             try {
                 const response = await fetch(
                     "http://localhost:4000/api/auth/me",
@@ -15,11 +16,11 @@ function AddRecipe() {
                     }
                 );
 
-                if(!response.ok){
+                if (!response.ok) {
                     navigate("/login");
                     return;
                 }
-            }catch (error){
+            } catch (error) {
                 console.error("Login check failed:", error);
                 navigate("/login");
                 return;
@@ -44,9 +45,10 @@ function AddRecipe() {
         instructions: ""
     });
     const [message, setMessage] = useState("");
-    
-    function handleChange(e){
-        const {name, value} = e.target;
+    const [imageFile, setImageFile] = useState(null);
+
+    function handleChange(e) {
+        const { name, value } = e.target;
 
         setFormData({
             ...formData,
@@ -54,30 +56,39 @@ function AddRecipe() {
         });
     }
 
-    async function handleSubmit(e){
+    async function handleSubmit(e) {
         e.preventDefault();
         setMessage("");
 
-        try{
+        try {
+            const recipeData = new FormData();
+
+            Object.entries(formData).forEach(([key, value]) => {
+                if (key === "image_url") return;
+
+                if (["prep_time", "cook_time", "servings"].includes(key)) {
+                    recipeData.append(key, value === "" ? "" : Number(value));
+                } else {
+                    recipeData.append(key, value);
+                }
+            });
+
+            if (imageFile) {
+                recipeData.append("image", imageFile);
+            }
+
             const response = await fetch(
                 "http://localhost:4000/api/recipes",
                 {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
                     credentials: "include",
-                    body: JSON.stringify({
-                        ...formData,
-                        prep_time: formData.prep_time ? Number(formData.prep_time) : null,
-                        cook_time: formData.cook_time ? Number(formData.cook_time) : null,
-                        servings: formData.servings ? Number(formData.servings) : null,
-                    })
+                    body: recipeData
                 }
             );
+
             const data = await response.json();
 
-            if(!response.ok) {
+            if (!response.ok) {
                 setMessage(data.error || "Something went wrong.");
                 return;
             }
@@ -85,11 +96,13 @@ function AddRecipe() {
             setMessage("Recipe added successfully!");
 
             navigate("/");
-        }catch (error){
+
+        } catch (error) {
             console.error("Error adding recipe:", error);
-            setMessage("Could not connect to the server");
+            setMessage("Could not connect to the server.");
         }
     }
+
 
     return (
         <div>
@@ -106,28 +119,29 @@ function AddRecipe() {
                         required
                     />
                 </div>
-                
+
                 <div>
                     <label>Description</label>
-                    <textarea 
+                    <textarea
                         name="description"
                         value={formData.description}
                         onChange={handleChange}
                     />
                 </div>
-                
+
                 <div>
                     <label>Image URL</label>
-                    <input 
+                    <input
+                        type="file"
                         name="image_url"
-                        value={formData.image_url}
-                        onChange={handleChange}
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) => setImageFile(e.target.files[0])}
                     />
                 </div>
 
                 <div>
                     <label>Category</label>
-                    <input 
+                    <input
                         name="category"
                         value={formData.category}
                         onChange={handleChange}
@@ -137,7 +151,7 @@ function AddRecipe() {
 
                 <div>
                     <label>Prep Time(minutes)</label>
-                    <input 
+                    <input
                         type="number"
                         min="0"
                         name="prep_time"
@@ -148,7 +162,7 @@ function AddRecipe() {
 
                 <div>
                     <label>Cook Time(minutes)</label>
-                    <input 
+                    <input
                         type="number"
                         min="0"
                         name="cook_time"
@@ -159,7 +173,7 @@ function AddRecipe() {
 
                 <div>
                     <label>Servings</label>
-                    <input 
+                    <input
                         type="number"
                         min="1"
                         name="servings"
@@ -185,7 +199,7 @@ function AddRecipe() {
 
                 <div>
                     <label>Ingredients</label>
-                    <textarea 
+                    <textarea
                         name="ingredients"
                         value={formData.ingredients}
                         onChange={handleChange}
@@ -204,7 +218,7 @@ function AddRecipe() {
                 </div>
 
                 <button type="submit">Save Recipe</button>
-                
+
                 {message && <p>{message}</p>}
             </form>
         </div>

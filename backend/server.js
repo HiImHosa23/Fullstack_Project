@@ -6,8 +6,43 @@ const session = require("express-session");
 const pgSession = require("connect-pg-simple")(session);
 const pool = require("./db/connection");
 const bcrypt = require("bcrypt");
+const multer = require("multer");
+const path = require("path");
 
 const app = express();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, "uploads"));
+    },
+    filename: (req, file, cb) => {
+        const uniqueName = 
+            Date.now() + "-" + Math.round(Math.random() * 1000000000);
+        
+        cb(null, uniqueName + path.extname(file.originalname).toLowerCase());
+    }
+});
+const upload = multer({
+    storage: storage,
+
+    limits: {
+        fileSize: 5 * 1024 * 1024
+    },
+
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif"
+        ];
+
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error("Only JPG, PNG, WEBP, and GIF images are allowed."));
+        }
+    }
+});
 const PORT = 4000;
 
 app.use(cors({
@@ -31,6 +66,7 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24
     }
 }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 function requireAuth(req, res, next) {
     if (!req.session.user) {
@@ -55,20 +91,19 @@ app.get("/db-test", async (req, res) => {
     }
 });
 
-app.get("/api/recipes", requireAuth, async (req, res) => {
+app.get("/api/recipes", async (req, res) => {
     try {
-        const userId = req.session.user.id;
+        const userId = req.session.user?.id || null;
 
         console.log("Logged-in user ID:", userId);
 
         const result = await pool.query(
-            `SELECT * FROM recipes
-            WHERE user_id = $1
+            `SELECT *,
+                COALESCE(user_id = $1, false) AS is_owner
+            FROM recipes
             ORDER BY created_at DESC`,
             [userId]
         );
-
-        console.log("Recipes found:", result.rows);
 
         res.json(result.rows);
 
@@ -81,12 +116,11 @@ app.get("/api/recipes", requireAuth, async (req, res) => {
     }
 });
 
-app.post("/api/recipes", requireAuth, async (req, res) => {
+app.post("/api/recipes", requireAuth, upload.single("image"), async (req, res) => {
     try {
         const {
             name,
             description,
-            image_url,
             category,
             prep_time,
             cook_time,
@@ -95,6 +129,10 @@ app.post("/api/recipes", requireAuth, async (req, res) => {
             ingredients,
             instructions
         } = req.body;
+
+        const image_url = req.file
+        ? `/uploads/${req.file.filename}`
+        : null;
 
         const result = await pool.query(
             `INSERT INTO recipes (
@@ -133,12 +171,11 @@ app.post("/api/recipes", requireAuth, async (req, res) => {
     }
 });
 
-app.put("/api/recipes/:id", requireAuth, async (req, res) => {
+app.put("/api/recipes/:id", requireAuth, upload.single("image"), async (req, res) => {
     try {
         const {
             name,
             description,
-            image_url,
             category,
             prep_time,
             cook_time,
@@ -147,6 +184,10 @@ app.put("/api/recipes/:id", requireAuth, async (req, res) => {
             ingredients,
             instructions
         } = req.body;
+
+        const image_url = req.file
+            ? `/uploads/${req.file.filename}`
+            : req.body.image_url;
 
         const result = await pool.query(
             `UPDATE recipes
@@ -223,6 +264,35 @@ app.get("/api/recipes/:id", requireAuth, async (req, res) => {
     }
 });
 
+app.delete("/api/recipes/:id", requireAuth, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `DELETE FROM recipes
+            WHERE id = $1 AND user_id = $2
+             RETURNING *`,
+            [
+                req.params.id,
+                req.session.user.id
+            ]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                error: "Recipe not found."
+            });
+        }
+
+        res.json({
+            message: "Recipe deleted successfully!"
+        });
+
+    } catch (err) {
+        console.error("Error deleting recipe:", err);
+        res.status(500).json({
+            error: "Failed to delete recipe."
+        });
+    }
+});
 
 app.post("/api/auth/register", async (req, res) => {
     try {

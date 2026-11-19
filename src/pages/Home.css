@@ -11,3 +11,10 @@
     margin: 8px 0;
     border-radius: 6px;
 }
+
+.recipe-image {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    border-radius: 10px;
+}
